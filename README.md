@@ -1,9 +1,11 @@
 # dominoiq-cli
 
-`dominoiq-cli` is a Node.js and TypeScript command-line app for sending prompts to a DominoIQ server through the Domino REST API.
+`dominoiq-cli` is a node js command-line app for sending prompts to a Domino IQ server through the Domino REST API.
 
 ## Requirements
 
+- Domino IQ running on a Domino server
+- Domino REST API
 - Node.js 18 or newer
 
 ## Install dependencies
@@ -36,34 +38,35 @@ When the CLI starts, enter slash commands to configure it:
 
 - `/config` sets the Domino API base URL, for example `http://localhost:8880`
 - `/commands` sets the `command` value sent to the completion endpoint, for example `StdReplyEmail`
-- `/login` prompts for username and password, then saves the returned JWT locally
-- `/status` shows the saved configuration
-- `/logout` clears the saved JWT
-- `/help` lists the available commands
+- `/login` prompts for a domino username and password and saves the token
+- `/status` shows the current  configuration
+- `/logout` logs out and clears the session
+- `/help` lists all available commands
 - `/exit` closes the CLI
 
-Any input that does not start with `/` is sent to:
+### Login to Domino REST API
 
-- `POST {baseUrl}/api/v1/dominoiq/completion`
-- JSON body: `{ "command": "<saved command>", "payload": "<your prompt>" }`
-- Header: `Authorization: Bearer <saved jwt>`
+To send any prompts to Domino IQ, you first need to login to the Domino REST API with a valid Domino user. Once logged in, your session will remain until the token issued by Domino REST API expires. You can also log out using the `/logout` command to log out of your session and clear the cached token.
 
-Login uses:
+### Quickstart
 
-- `POST {baseUrl}/auth`
-- JSON body: `{ "username": "<username>", "password": "<password>" }`
+- use the `/config` command to configure the URL of the Domino REST API
+- use the `/commands` command to configure the Domino IQ command to use (e.g 'StdReplyEmail')
+- use the `/login` command to log in to the Domino REST API
+
+Then type something to send a prompt to DominoIQ and receive a response.
 
 ## One-shot usage
 
 You can also submit a single prompt without entering the interactive shell:
 
 ```bash
-node dist/index.js --prompt "Body of the email to reply to"
+node dist/index.js --prompt "How are things?"
 ```
 
 ## Local config storage
 
-The CLI stores the base URL, default command, and JWT in:
+The CLI stores the Domino REST API URL, default command, and Domino REST API JWT in:
 
 ```text
 %USERPROFILE%\.dominoiq-cli\config.json
