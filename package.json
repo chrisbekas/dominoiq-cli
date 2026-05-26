@@ -1,11 +1,14 @@
 {
   "name": "dominoiq-cli",
   "version": "1.0.0",
-  "description": "Interactive CLI for DominoIQ prompt submission through the Domino REST API.",
+  "description": "Command-line app for sending prompts to a Domino IQ server",
   "main": "dist/index.js",
   "bin": {
     "dominoiq-cli": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",
@@ -16,8 +19,8 @@
     "dominoiq",
     "domino"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Chris Bekas",
+  "license": "MIT",
   "engines": {
     "node": ">=18"
   },

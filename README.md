@@ -36,7 +36,7 @@ npm start
 
 When the CLI starts, enter slash commands to configure it:
 
-- `/config` sets the Domino API base URL, for example `http://localhost:8880`
+- `/config` sets the Domino REST API URL, for example `http://localhost:8880`
 - `/commands` sets the `command` value sent to the completion endpoint, for example `StdReplyEmail`
 - `/login` prompts for a domino username and password and saves the token
 - `/status` shows the current  configuration
@@ -54,7 +54,7 @@ To send any prompts to Domino IQ, you first need to login to the Domino REST API
 - use the `/commands` command to configure the Domino IQ command to use (e.g 'StdReplyEmail')
 - use the `/login` command to log in to the Domino REST API
 
-Then type something to send a prompt to DominoIQ and receive a response.
+Then type something to send a prompt to Domino IQ and receive a response.
 
 ## One-shot usage
 
@@ -64,7 +64,7 @@ You can also submit a single prompt without entering the interactive shell:
 node dist/index.js --prompt "How are things?"
 ```
 
-## Local config storage
+## Local configuration storage
 
 The CLI stores the Domino REST API URL, default command, and Domino REST API JWT in:
 
