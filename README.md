@@ -1,11 +1,11 @@
 # dominoiq-cli
 
-dominoiq-cli is a command-line app for sending prompts to a Domino IQ server through the Domino REST API.
+dominoiq-cli is a command-line app for sending prompts to a Domino IQ server using the Domino REST API.
 
 ## Requirements
 
 - Domino IQ running on a Domino server
-- Domino REST API v1.1.4+
+- Domino REST API v1.1.4 or newer
 - Node.js 18 or newer
 
 ## Install
@@ -32,9 +32,9 @@ When the CLI starts, enter slash commands to configure it:
 - `/help` lists all available commands
 - `/exit` closes the CLI
 
-### Login to Domino REST API
+### Authentication
 
-To send any prompts to Domino IQ, you first need to login to the Domino REST API with a valid Domino user. Once logged in, your session will remain until the token issued by Domino REST API expires. You can also log out using the `/logout` command to log out of your session and clear the cached token.
+To send any prompts to Domino IQ, you first need to log in to the Domino REST API with a valid Domino user. Once logged in, your session will remain until the token issued by Domino REST API expires. You can log out using the `/logout` command to log out of your current session and clear the cached token.
 
 ### Quickstart
 
