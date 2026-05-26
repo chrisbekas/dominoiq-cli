@@ -8,31 +8,19 @@
 - Domino REST API
 - Node.js 18 or newer
 
-## Install dependencies
+## Install
 
 ```bash
-npm install
+npm install -g dominoiq-cli
 ```
 
-## Run in development
+## Start the CLI
 
 ```bash
-npm run dev
+dominoiq-cli
 ```
 
-## Build
-
-```bash
-npm run build
-```
-
-## Start the built CLI
-
-```bash
-npm start
-```
-
-## Interactive commands
+## Usage
 
 When the CLI starts, enter slash commands to configure it:
 
@@ -61,7 +49,7 @@ Then type something to send a prompt to Domino IQ and receive a response.
 You can also submit a single prompt without entering the interactive shell:
 
 ```bash
-node dist/index.js --prompt "How are things?"
+dominoiq-cli --prompt "How are things?"
 ```
 
 ## Local configuration storage
