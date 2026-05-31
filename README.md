@@ -24,11 +24,12 @@ dominoiq-cli
 
 When the CLI starts, enter slash commands to configure it:
 
-- `/config` sets the Domino REST API URL, for example `http://domino-server:8880`
+- `/config` sets the Domino REST API URL, for example `http://domino-server.com:8880`
 - `/commands` sets the Domino IQ `command` to use, for example `StdReplyEmail`
 - `/login` prompts for a domino username and password and saves the token
-- `/status` shows the current  configuration
 - `/logout` logs out and clears the session
+- `/status` shows the current /configuration
+- `/version` shows the current app version
 - `/help` lists all available commands
 - `/exit` closes the CLI
 
