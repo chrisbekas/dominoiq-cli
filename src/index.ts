@@ -2,7 +2,6 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import process from "node:process";
 import ora from "ora";
@@ -59,157 +58,57 @@ async function askHiddenLine(label: string): Promise<string> {
     return askLine(label);
   }
 
-  return new Promise<string>((resolve, reject) => {
-    const previousRawMode = process.stdin.isRaw;
-    let value = "";
+  return new Promise((resolve, reject) => {
+    process.stdout.write(`${label}: `);
 
-    const cleanup = () => {
-      process.stdin.removeListener("keypress", onKeypress);
-      process.stdin.setRawMode?.(previousRawMode);
-      process.stdin.pause();
-      process.stdout.write("\n");
-    };
+    let password = "";
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding("utf8");
 
-    const onKeypress = (text: string, key: { ctrl?: boolean; name?: string; sequence?: string }) => {
-      if (key.ctrl && key.name === "c") {
-        cleanup();
-        reject(new Error("Login was cancelled."));
-        return;
-      }
-
-      if (key.name === "return" || key.name === "enter") {
-        cleanup();
-        resolve(value);
-        return;
-      }
-
-      if (key.name === "backspace") {
-        if (value.length > 0) {
-          value = value.slice(0, -1);
+    function onData(char: string) {
+      if (char === "\r" || char === "\n") {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        process.stdin.removeListener("data", onData);
+        process.stdout.write("\n");
+        resolve(password);
+      } else if (char === "\u0003") {
+        // Ctrl+C
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        process.stdin.removeListener("data", onData);
+        process.stdout.write("\n");
+        reject(new Error("Cancelled."));
+      } else if (char === "\u007f" || char === "\b") {
+        // Backspace
+        if (password.length > 0) {
+          password = password.slice(0, -1);
           process.stdout.write("\b \b");
         }
-        return;
+      } else {
+        password += char;
+        process.stdout.write("*");
       }
+    }
 
-      if (!key.sequence || key.name === "escape") {
-        return;
-      }
-
-      value += text;
-      process.stdout.write("*");
-    };
-
-    emitKeypressEvents(process.stdin);
-    process.stdout.write(`${label}: `);
-    process.stdin.resume();
-    process.stdin.setRawMode?.(true);
-    process.stdin.on("keypress", onKeypress);
+    process.stdin.on("data", onData);
   });
 }
 
 async function askWithHistory(label: string, history: string[]): Promise<string> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    return askLine(label);
-  }
-
-  return new Promise<string>((resolve, reject) => {
-    const previousRawMode = process.stdin.isRaw;
-    let value = "";
-    let cursor = 0;
-    let historyIndex = -1;
-    let savedInput = "";
-
-    const write = (s: string) => process.stdout.write(s);
-
-    const redraw = (newValue: string, newCursor: number) => {
-      write("\r" + label + " " + newValue + "\x1b[K");
-      const moveBack = newValue.length - newCursor;
-      if (moveBack > 0) write(`\x1b[${moveBack}D`);
-      value = newValue;
-      cursor = newCursor;
-    };
-
-    const cleanup = () => {
-      process.stdin.removeListener("keypress", onKeypress);
-      process.stdin.setRawMode?.(previousRawMode);
-      process.stdin.pause();
-      write("\n");
-    };
-
-    const onKeypress = (text: string, key: { ctrl?: boolean; meta?: boolean; name?: string; sequence?: string }) => {
-      if (!key) return;
-
-      if (key.ctrl && key.name === "c") {
-        cleanup();
-        reject(new Error("Cancelled."));
-        return;
-      }
-
-      if (key.name === "return" || key.name === "enter") {
-        cleanup();
-        resolve(value);
-        return;
-      }
-
-      if (key.name === "up") {
-        if (history.length === 0) return;
-        if (historyIndex === -1) savedInput = value;
-        historyIndex = Math.min(historyIndex + 1, history.length - 1);
-        const entry = history[history.length - 1 - historyIndex] ?? "";
-        redraw(entry, entry.length);
-        return;
-      }
-
-      if (key.name === "down") {
-        if (historyIndex === -1) return;
-        historyIndex--;
-        const entry = historyIndex === -1 ? savedInput : (history[history.length - 1 - historyIndex] ?? "");
-        redraw(entry, entry.length);
-        return;
-      }
-
-      if (key.name === "left") {
-        if (cursor > 0) { cursor--; write("\x1b[1D"); }
-        return;
-      }
-
-      if (key.name === "right") {
-        if (cursor < value.length) { cursor++; write("\x1b[1C"); }
-        return;
-      }
-
-      if (key.name === "home") {
-        if (cursor > 0) { write(`\x1b[${cursor}D`); cursor = 0; }
-        return;
-      }
-
-      if (key.name === "end") {
-        const moveRight = value.length - cursor;
-        if (moveRight > 0) { write(`\x1b[${moveRight}C`); cursor = value.length; }
-        return;
-      }
-
-      if (key.name === "backspace") {
-        if (cursor > 0) redraw(value.slice(0, cursor - 1) + value.slice(cursor), cursor - 1);
-        return;
-      }
-
-      if (key.name === "delete") {
-        if (cursor < value.length) redraw(value.slice(0, cursor) + value.slice(cursor + 1), cursor);
-        return;
-      }
-
-      if (!key.sequence || key.ctrl || key.meta || key.name === "escape") return;
-
-      redraw(value.slice(0, cursor) + text + value.slice(cursor), cursor + text.length);
-    };
-
-    emitKeypressEvents(process.stdin);
-    write(`${label} `);
-    process.stdin.resume();
-    process.stdin.setRawMode?.(true);
-    process.stdin.on("keypress", onKeypress);
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    history: [...history].reverse(),
+    historySize: Math.max(history.length, 30),
   });
+
+  try {
+    return await rl.question(`${label} `);
+  } finally {
+    rl.close();
+  }
 }
 
 function printWelcome(config: AppConfig): void {
@@ -222,19 +121,20 @@ function printWelcome(config: AppConfig): void {
 
   console.log(`  ${config.baseUrl ? check : cross}  REST API URL     ${config.baseUrl ? chalk.white(config.baseUrl) : chalk.dim("not set — use /config")}`);
   console.log(`  ${config.command ? check : cross}  Default command  ${config.command ? chalk.white(config.command) : chalk.dim("not set — use /commands")}`);
-  console.log(`  ${config.token ? check : cross}  Logged in        ${config.token ? chalk.white("Yes") : chalk.dim("No — use /login")}`);
+  console.log(`  ${config.token ? check : cross}  Logged in        ${config.token ? chalk.white("Yes") : chalk.dim("not set — use /login")}`);
   console.log("");
-  console.log(chalk.dim("  Type /help for commands, or enter a prompt to send it to DominoIQ."));
+  console.log(chalk.dim("  Type /help for commands, or enter a prompt to send it to Domino IQ."));
   console.log("");
 }
 
 function printHelp(): void {
   console.log(chalk.cyan("Slash commands"));
-  console.log("  /config [url]     Set the Domino API base URL");
-  console.log("  /commands [name]  Set the default command payload value");
-  console.log("  /login            Authenticate and save the JWT");
+  console.log("  /config [url]     Set the Domino REST API URL");
+  console.log("  /commands [name]  Set the default Domino IQ command");
+  console.log("  /login            Authenticate and save the token");
   console.log("  /logout           Log out and clear your session");
   console.log("  /status           Show the current configuration");
+  console.log("  /version          Show the current app version");
   console.log("  /help             Show this help");
   console.log("  /exit             Exit the CLI");
   console.log("");
@@ -246,7 +146,7 @@ function printStatus(config: AppConfig): void {
 
   console.log(`  ${config.baseUrl ? check : cross}  REST API URL     ${config.baseUrl ? chalk.white(config.baseUrl) : chalk.dim("not set — use /config")}`);
   console.log(`  ${config.command ? check : cross}  Default command  ${config.command ? chalk.white(config.command) : chalk.dim("not set — use /commands")}`);
-  console.log(`  ${config.token ? check : cross}  Logged in        ${config.token ? chalk.white("Yes") : chalk.dim("No — use /login")}`);
+  console.log(`  ${config.token ? check : cross}  Logged in        ${config.token ? chalk.white("Yes") : chalk.dim("not set — use /login")}`);
   console.log(`  ${check}  Config file      ${chalk.white(getConfigPath())}`);
   console.log("");
 }
@@ -271,7 +171,7 @@ async function promptForBaseUrl(currentBaseUrl: string, inlineValue: string): Pr
   }
 
   const response = requirePromptResult(
-    await askLine("Domino API base URL", currentBaseUrl || "http://localhost:8880"),
+    await askLine("Domino REST API URL", currentBaseUrl || "http://localhost:8880"),
     "REST API URL update",
   );
 
@@ -289,7 +189,7 @@ async function promptForCommand(currentCommand: string, inlineValue: string): Pr
   }
 
   const response = requirePromptResult(
-    await askLine("Default DominoIQ command", currentCommand || "StdReplyEmail"),
+    await askLine("Default Domino IQ command", currentCommand || "StdReplyEmail"),
     "Command update",
   );
   const nextCommand = (response || currentCommand || "StdReplyEmail").trim();
@@ -303,7 +203,7 @@ async function promptForCommand(currentCommand: string, inlineValue: string): Pr
 
 async function promptForLogin(config: AppConfig): Promise<AppConfig> {
   if (!config.baseUrl) {
-    throw new Error("Set the Domino API base URL with /config before logging in.");
+    throw new Error("Set the Domino REST API URL with /config before logging in.");
   }
 
   const username = requirePromptResult(await askLine("username:"), "Login").trim();
@@ -367,7 +267,7 @@ async function clearToken(config: AppConfig): Promise<AppConfig> {
 
 function assertReadyToSend(config: AppConfig): void {
   if (!config.baseUrl) {
-    throw new Error("Set the Domino API base URL with /config before sending prompts.");
+    throw new Error("Set the Domino REST API URL with /config before sending prompts.");
   }
 
   if (!config.command) {
@@ -413,6 +313,10 @@ async function handleSlashCommand(input: string, config: AppConfig): Promise<Sla
     case "/status":
       printStatus(config);
       return { config, shouldExit: false };
+    case "/version":
+      console.log(`${chalk.white(readPackageVersion())}`);
+      console.log("");
+      return { config, shouldExit: false };
     case "/help":
       printHelp();
       return { config, shouldExit: false };
@@ -433,7 +337,7 @@ async function runInteractive(): Promise<void> {
   const history: string[] = [];
 
   while (true) {
-    const input = (await askWithHistory(chalk.gray(">"), history)).trim();
+    const input = (await askWithHistory(chalk.gray("❯"), history)).trim();
 
     if (!input) {
       continue;
@@ -474,7 +378,7 @@ async function main(): Promise<void> {
 
   program
     .name("dominoiq-cli")
-    .description("Send prompts to DominoIQ through the Domino REST API.")
+    .description("Send prompts to Domino IQ through the Domino REST API.")
     .version(readPackageVersion())
     .option("-p, --prompt <text>", "send one prompt without entering interactive mode");
 

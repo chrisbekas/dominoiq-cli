@@ -152,7 +152,7 @@ export async function login(baseUrl: string, username: string, password: string)
 
     if (response.status === 401 || response.status === 403) {
       throw new Error(
-        `Login failed. Check your username and password, then verify the Domino API base URL with /status or update it with /config if needed.`,
+        `Login failed. Check your username and password, then verify the Domino REST API URL with /status or update it with /config if needed.`,
       );
     }
 

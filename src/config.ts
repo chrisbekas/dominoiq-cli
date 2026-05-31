@@ -54,13 +54,13 @@ export function validateBaseUrl(value: string): string {
   const normalized = normalizeBaseUrl(value);
 
   if (!normalized) {
-    throw new Error("The Domino API base URL cannot be empty.");
+    throw new Error("The Domino REST API URL cannot be empty.");
   }
 
   try {
     new URL(normalized);
   } catch {
-    throw new Error("The Domino API base URL must be a valid absolute URL.");
+    throw new Error("The Domino REST API URL must be a valid absolute URL.");
   }
 
   return normalized;
