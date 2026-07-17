@@ -86,6 +86,66 @@ function buildDominoUrl(baseUrl: string, path: string): string {
   return new URL(path, `${baseUrl}/`).toString();
 }
 
+function tryParseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function extractCompletionText(value: unknown, depth = 0): string | undefined {
+  if (depth > 5) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    if (!value.trim()) {
+      return undefined;
+    }
+
+    const parsed = tryParseJson(value);
+    if (parsed !== undefined) {
+      return extractCompletionText(parsed, depth + 1) ?? value;
+    }
+
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 1) {
+      return extractCompletionText(value[0], depth + 1);
+    }
+
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const preferredFields = ["content", "completion", "response", "result", "message", "text", "output", "payload"];
+  for (const fieldName of preferredFields) {
+    if (!(fieldName in value)) {
+      continue;
+    }
+
+    const extracted = extractCompletionText(value[fieldName], depth + 1);
+    if (extracted) {
+      return extracted;
+    }
+  }
+
+  if ("data" in value) {
+    const extracted = extractCompletionText(value.data, depth + 1);
+    if (extracted) {
+      return extracted;
+    }
+  }
+
+  return undefined;
+}
+
 function formatFetchFailureMessage(
   operation: string,
   requestUrl: string,
@@ -229,23 +289,9 @@ export async function requestCompletion(baseUrl: string, token: string, command:
 }
 
 export function formatCompletionResponse(responseBody: unknown): string {
-  if (typeof responseBody === "string") {
-    return responseBody;
-  }
-
-  if (Array.isArray(responseBody)) {
-    return JSON.stringify(responseBody, null, 2);
-  }
-
-  if (isRecord(responseBody)) {
-    const preferredFields = ["content", "completion", "response", "result", "message", "text", "output", "payload"];
-
-    for (const fieldName of preferredFields) {
-      const value = responseBody[fieldName];
-      if (typeof value === "string" && value.trim()) {
-        return value;
-      }
-    }
+  const extracted = extractCompletionText(responseBody);
+  if (extracted) {
+    return extracted;
   }
 
   return JSON.stringify(responseBody, null, 2);

@@ -10,9 +10,12 @@ import figlet from "figlet";
 import { Command } from "commander";
 import { getConfigPath, loadConfig, saveConfig, type AppConfig, validateBaseUrl } from "./config";
 import { formatCompletionResponse, login, logout, requestCompletion } from "./dominoApi";
+import { renderMarkdownResponse } from "./markdown";
 
 type CliOptions = {
   prompt?: string;
+  markdown: boolean;
+  command?: string;
 };
 
 type SlashCommandResult = {
@@ -120,7 +123,7 @@ function printWelcome(config: AppConfig): void {
   const cross = chalk.dim("○");
 
   console.log(`  ${config.baseUrl ? check : cross}  REST API URL     ${config.baseUrl ? chalk.white(config.baseUrl) : chalk.dim("not set — use /config")}`);
-  console.log(`  ${config.command ? check : cross}  Default command  ${config.command ? chalk.white(config.command) : chalk.dim("not set — use /commands")}`);
+  console.log(`  ${config.command ? check : cross}  Default command  ${config.command ? chalk.white(config.command) : chalk.dim("not set — use /command")}`);
   console.log(`  ${config.token ? check : cross}  Logged in        ${config.token ? chalk.white("Yes") : chalk.dim("not set — use /login")}`);
   console.log("");
   console.log(chalk.dim("  Type /help for commands, or enter a prompt to send it to Domino IQ."));
@@ -128,10 +131,11 @@ function printWelcome(config: AppConfig): void {
 }
 
 function printHelp(): void {
+  console.log("");
   console.log(chalk.cyan("Slash commands"));
   console.log("  /config [url]     Set the Domino REST API URL");
-  console.log("  /commands [name]  Set the default Domino IQ command");
-  console.log("  /login            Authenticate and save the token");
+  console.log("  /command [name]   Set the default Domino IQ command");
+  console.log("  /login            Authenticate and save the session");
   console.log("  /logout           Log out and clear your session");
   console.log("  /status           Show the current configuration");
   console.log("  /version          Show the current app version");
@@ -144,6 +148,7 @@ function printStatus(config: AppConfig): void {
   const check = chalk.green("✔");
   const cross = chalk.dim("○");
 
+  console.log("");
   console.log(`  ${config.baseUrl ? check : cross}  REST API URL     ${config.baseUrl ? chalk.white(config.baseUrl) : chalk.dim("not set — use /config")}`);
   console.log(`  ${config.command ? check : cross}  Default command  ${config.command ? chalk.white(config.command) : chalk.dim("not set — use /commands")}`);
   console.log(`  ${config.token ? check : cross}  Logged in        ${config.token ? chalk.white("Yes") : chalk.dim("not set — use /login")}`);
@@ -265,12 +270,14 @@ async function clearToken(config: AppConfig): Promise<AppConfig> {
   return nextConfig;
 }
 
-function assertReadyToSend(config: AppConfig): void {
+function assertReadyToSend(config: AppConfig, commandOverride?: string): void {
   if (!config.baseUrl) {
     throw new Error("Set the Domino REST API URL with /config before sending prompts.");
   }
 
-  if (!config.command) {
+  const effectiveCommand = commandOverride?.trim() || config.command;
+
+  if (!effectiveCommand) {
     throw new Error("Set the default command with /commands before sending prompts.");
   }
 
@@ -279,21 +286,40 @@ function assertReadyToSend(config: AppConfig): void {
   }
 }
 
-async function sendPrompt(promptText: string, config: AppConfig): Promise<void> {
-  assertReadyToSend(config);
+async function sendPrompt(
+  promptText: string,
+  config: AppConfig,
+  markdownEnabled: boolean,
+  commandOverride?: string,
+): Promise<void> {
+  assertReadyToSend(config, commandOverride);
+  const effectiveCommand = commandOverride?.trim() || config.command;
+  console.log("");
   const spinner = ora({ text: "Working...", spinner: "dots" }).start();
   let responseBody: unknown;
 
   try {
-    responseBody = await requestCompletion(config.baseUrl, config.token, config.command, promptText);
+    responseBody = await requestCompletion(config.baseUrl, config.token, effectiveCommand, promptText);
     spinner.stop();
   } catch (error) {
     spinner.stop();
     throw error;
   }
 
-  console.log("");
-  console.log(formatCompletionResponse(responseBody));
+  const responseText = formatCompletionResponse(responseBody);
+
+  if (!markdownEnabled) {
+    console.log(responseText.trimEnd());
+    console.log("");
+    return;
+  }
+
+  try {
+    const rendered = renderMarkdownResponse(responseText);
+    console.log(rendered.trimStart().trimEnd());
+  } catch {
+    console.log(responseText.trimEnd());
+  }
   console.log("");
 }
 
@@ -302,18 +328,23 @@ async function handleSlashCommand(input: string, config: AppConfig): Promise<Sla
 
   switch (name) {
     case "/config":
+      console.log("");
       return { config: await updateBaseUrl(config, argument), shouldExit: false };
     case "/commands":
     case "/command":
+      console.log("");
       return { config: await updateCommand(config, argument), shouldExit: false };
     case "/login":
+      console.log("");
       return { config: await promptForLogin(config), shouldExit: false };
     case "/logout":
+      console.log("");
       return { config: await clearToken(config), shouldExit: false };
     case "/status":
       printStatus(config);
       return { config, shouldExit: false };
     case "/version":
+      console.log("");
       console.log(`${chalk.white(readPackageVersion())}`);
       console.log("");
       return { config, shouldExit: false };
@@ -324,6 +355,7 @@ async function handleSlashCommand(input: string, config: AppConfig): Promise<Sla
     case "/quit":
       return { config, shouldExit: true };
     default:
+      console.log("");
       console.log(chalk.yellow(`Unknown command: ${name}`));
       console.log(chalk.dim("Type /help to list the available slash commands."));
       console.log("");
@@ -331,13 +363,13 @@ async function handleSlashCommand(input: string, config: AppConfig): Promise<Sla
   }
 }
 
-async function runInteractive(): Promise<void> {
+async function runInteractive(markdownEnabled: boolean, commandOverride?: string): Promise<void> {
   let config = await loadConfig();
   printWelcome(config);
   const history: string[] = [];
 
   while (true) {
-    const input = (await askWithHistory(chalk.gray("❯"), history)).trim();
+    const input = (await askWithHistory(chalk.white("❯"), history)).trim();
 
     if (!input) {
       continue;
@@ -359,7 +391,7 @@ async function runInteractive(): Promise<void> {
         continue;
       }
 
-      await sendPrompt(input, config);
+      await sendPrompt(input, config, markdownEnabled, commandOverride);
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred.";
       console.error(chalk.red(message));
@@ -368,9 +400,9 @@ async function runInteractive(): Promise<void> {
   }
 }
 
-async function runSinglePrompt(promptText: string): Promise<void> {
+async function runSinglePrompt(promptText: string, markdownEnabled: boolean, commandOverride?: string): Promise<void> {
   const config = await loadConfig();
-  await sendPrompt(promptText.trim(), config);
+  await sendPrompt(promptText.trim(), config, markdownEnabled, commandOverride);
 }
 
 async function main(): Promise<void> {
@@ -378,20 +410,22 @@ async function main(): Promise<void> {
 
   program
     .name("dominoiq-cli")
-    .description("Send prompts to Domino IQ through the Domino REST API.")
+    .description("Send prompts to Domino IQ using the Domino REST API.")
     .version(readPackageVersion())
-    .option("-p, --prompt <text>", "send one prompt without entering interactive mode");
+    .option("-p, --prompt <text>", "send one prompt without entering interactive mode")
+    .option("-c, --command <name>", "override the configured Domino IQ command for this run")
+    .option("--no-markdown", "disable markdown rendering in responses");
 
   program.parse(process.argv);
 
   const options = program.opts<CliOptions>();
 
   if (options.prompt) {
-    await runSinglePrompt(options.prompt);
+    await runSinglePrompt(options.prompt, options.markdown, options.command);
     return;
   }
 
-  await runInteractive();
+  await runInteractive(options.markdown, options.command);
 }
 
 void main().catch((error: unknown) => {

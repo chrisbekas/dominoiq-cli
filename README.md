@@ -25,10 +25,10 @@ dominoiq-cli
 When the CLI starts, enter slash commands to configure it:
 
 - `/config` sets the Domino REST API URL, for example `http://domino-server.com:8880`
-- `/commands` sets the Domino IQ `command` to use, for example `StdReplyEmail`
-- `/login` prompts for a domino username and password and saves the token
+- `/command` sets the Domino IQ `command` to use, for example `StdReplyEmail`
+- `/login` prompts for a domino username and password and saves the session
 - `/logout` logs out and clears the session
-- `/status` shows the current /configuration
+- `/status` shows the current configuration
 - `/version` shows the current app version
 - `/help` lists all available commands
 - `/exit` closes the CLI
@@ -40,7 +40,7 @@ To send any prompts to Domino IQ, you first need to log in to the Domino REST AP
 ### Quickstart
 
 - use the `/config` command to configure the URL of the Domino REST API
-- use the `/commands` command to configure the Domino IQ command to use (e.g 'StdReplyEmail')
+- use the `/command` command to configure the Domino IQ command to use (e.g 'StdReplyEmail')
 - use the `/login` command to log in to the Domino REST API
 
 Then type something to send a prompt to Domino IQ and receive a response.
@@ -51,6 +51,9 @@ You can also submit a single prompt without entering the interactive shell:
 
 ```bash
 dominoiq-cli --prompt "How are things?"
+
+# use a specific Domino IQ command for one-shot mode
+dominoiq-cli --prompt "How are things?" --command StdReplyEmail
 ```
 
 ## Local configuration storage
